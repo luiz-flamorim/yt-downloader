@@ -9,7 +9,7 @@ if (!fs.existsSync(outputDir)) {
 	fs.mkdirSync(outputDir);
 }
 
-const videos = ["https://www.youtube.com/watch?v=ZZ1VpJjxi6c"];
+const videos = [];
 
 videos.forEach((video, index) => {
 	const baseFilename = `video${(index + 1).toString().padStart(2, "0")}`;
