@@ -1,200 +1,162 @@
-// const { exec } = require("child_process");
-// const fs = require("fs");
-// const path = require("path");
-
-// const outputDir = path.resolve("output"); // Define output directory
-
-// // Ensure output directory exists
-// if (!fs.existsSync(outputDir)) {
-// 	fs.mkdirSync(outputDir);
-// }
-
-// const videos = [
-	
-// ];
-
-// videos.forEach((video, index) => {
-// 	const baseFilename = `video${(index + 1).toString().padStart(2, "0")}`;
-// 	const tempFilename = `temp_video_${index + 1}`;
-// 	let outputFilename = path.join(outputDir, `${baseFilename}.mp4`);
-
-// 	console.log(`📥 Downloading: ${video}`);
-
-// 	// Step 1: Download best video + audio in any format
-// 	exec(
-// 		`yt-dlp -f "bv*+ba/b" -o "${tempFilename}.%(ext)s" "${video}"`,
-// 		(error) => {
-// 			if (error) {
-// 				console.error(`Error downloading ${video}:`, error);
-// 				return;
-// 			}
-// 			console.log(`✅ Download complete: ${video}`);
-
-// 			// Step 2: Find the correct downloaded filename
-// 			fs.readdir(".", (err, files) => {
-// 				if (err) {
-// 					console.error("Error reading directory:", err);
-// 					return;
-// 				}
-
-// 				// Detect the downloaded file (could be .webm, .mkv, etc.)
-// 				let downloadedFile = files.find((file) =>
-// 					file.startsWith(tempFilename)
-// 				);
-// 				if (!downloadedFile) {
-// 					console.error(`Could not find downloaded file for ${video}`);
-// 					return;
-// 				}
-
-// 				let downloadedFilePath = path.resolve(downloadedFile);
-
-// 				// Step 3: Ensure unique filename in output directory
-// 				let counter = 1;
-// 				while (fs.existsSync(outputFilename)) {
-// 					outputFilename = path.join(
-// 						outputDir,
-// 						`${baseFilename}-${counter.toString().padStart(2, "0")}.mp4`
-// 					);
-// 					counter++;
-// 				}
-
-// 				console.log(`Converting ${downloadedFile} to MP4...`);
-
-// 				// Step 4: Convert to MP4 using ffmpeg
-// 				exec(
-// 					`ffmpeg -i "${downloadedFilePath}" -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 192k "${outputFilename}"`,
-// 					(convertError) => {
-// 						if (convertError) {
-// 							console.error(
-// 								`Error converting ${downloadedFile}:`,
-// 								convertError
-// 							);
-// 							return;
-// 						}
-
-// 						console.log(`🎬 Successfully converted to MP4: ${outputFilename}`);
-
-// 						// Step 5: Cleanup temporary files
-// 						fs.unlink(downloadedFilePath, (unlinkErr) => {
-// 							if (unlinkErr) {
-// 								console.error(
-// 									`Warning: Could not delete temp file ${downloadedFilePath}`
-// 								);
-// 							} else {
-// 								console.log(`Deleted temporary file: ${downloadedFilePath}`);
-// 							}
-// 						});
-// 					}
-// 				);
-// 			});
-// 		}
-// 	);
-// });
-
 const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
+const puppeteer = require("puppeteer");
 
-// Setup terminal input
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+const COOKIES_FILE = "cookies.txt";
+const OUTPUT_DIR = path.resolve("output");
 
-const outputDir = path.resolve("output"); // Define output directory
-
-// Ensure output directory exists
-if (!fs.existsSync(outputDir)) {
-  fs.mkdirSync(outputDir);
+function formatCookiesForYtDlp(cookies) {
+  return (
+    "# Netscape HTTP Cookie File\n\n" +
+    cookies
+      .map((cookie) => {
+        const domain = cookie.domain.startsWith(".") ? cookie.domain : `.${cookie.domain}`;
+        const flag = cookie.domain.startsWith(".") ? "TRUE" : "FALSE";
+        const path = cookie.path || "/";
+        const secure = cookie.secure ? "TRUE" : "FALSE";
+        const expiration = Math.floor(cookie.expires || Date.now() / 1000 + 3600);
+        return [domain, flag, path, secure, expiration, cookie.name, cookie.value].join("\t");
+      })
+      .join("\n")
+  );
 }
 
-// Prompt user for URLs
-rl.question("Enter YouTube URLs (comma-separated): ", (input) => {
-  const videos = input.split(",").map((url) => url.trim());
-
-  if (videos.length === 0 || videos[0] === "") {
-    console.log("No URLs provided. Exiting...");
-    rl.close();
+async function ensureCookies() {
+  if (fs.existsSync(COOKIES_FILE)) {
+    console.log("🍪 cookies.txt already exists — skipping login.");
     return;
   }
 
-  videos.forEach((video) => {
-    console.log(`📥 Fetching title for: ${video}`);
-
-    // Get video title with legacy server connect option
-    exec(`yt-dlp --legacy-server-connect --get-title "${video}"`, (titleError, titleStdout) => {
-      if (titleError) {
-        console.error(`Error fetching title for ${video}:`, titleError);
-        return;
-      }
-
-      const videoTitle = titleStdout.trim().replace(/[<>:"/\\|?*]/g, ""); // Sanitize filename
-      const tempFilename = `temp_${videoTitle}`;
-      const outputFilename = path.join(outputDir, `${videoTitle}.mp4`);
-
-      console.log(`📥 Downloading: ${video} as "${videoTitle}.mp4"`);
-
-      // Step 1: Download best video + audio in any format
-      exec(
-        `yt-dlp --legacy-server-connect -f "bv*+ba/b" -o "${tempFilename}.%(ext)s" "${video}"`,
-        (downloadError) => {
-          if (downloadError) {
-            console.error(`Error downloading ${video}:`, downloadError);
-            return;
-          }
-          console.log(`✅ Download complete: ${videoTitle}`);
-
-          // Step 2: Find the correct downloaded filename
-          fs.readdir(".", (err, files) => {
-            if (err) {
-              console.error("Error reading directory:", err);
-              return;
-            }
-
-            let downloadedFile = files.find((file) =>
-              file.startsWith(tempFilename)
-            );
-            if (!downloadedFile) {
-              console.error(`Could not find downloaded file for ${video}`);
-              return;
-            }
-
-            let downloadedFilePath = path.resolve(downloadedFile);
-
-            console.log(`🎬 Converting ${downloadedFile} to MP4...`);
-
-            // Step 3: Convert to MP4 using ffmpeg
-            exec(
-              `ffmpeg -i "${downloadedFilePath}" -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 192k "${outputFilename}"`,
-              (convertError) => {
-                if (convertError) {
-                  console.error(
-                    `Error converting ${downloadedFile}:`,
-                    convertError
-                  );
-                  return;
-                }
-
-                console.log(`🎬 Successfully converted to MP4: ${outputFilename}`);
-
-                // Step 4: Cleanup temporary files
-                fs.unlink(downloadedFilePath, (unlinkErr) => {
-                  if (unlinkErr) {
-                    console.error(
-                      `Warning: Could not delete temp file ${downloadedFilePath}`
-                    );
-                  } else {
-                    console.log(`Deleted temporary file: ${downloadedFilePath}`);
-                  }
-                });
-              }
-            );
-          });
-        }
-      );
-    });
+  const browser = await puppeteer.launch({
+    headless: false,
+    defaultViewport: null,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-blink-features=AutomationControlled",
+      "--disable-infobars",
+    ],
+    ignoreDefaultArgs: ["--enable-automation"],
+    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   });
 
-  rl.close();
-});
+  const page = await browser.newPage();
+
+  await page.setUserAgent(
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+  );
+  await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
+
+  console.log("🔗 Opening YouTube... Please log in manually.");
+  await page.goto("https://www.youtube.com", { waitUntil: "networkidle2" });
+
+  console.log("⏳ Waiting 45 seconds for login...");
+  await new Promise((resolve) => setTimeout(resolve, 45000));
+
+  const cookies = await page.cookies();
+  fs.writeFileSync(COOKIES_FILE, formatCookiesForYtDlp(cookies));
+  console.log("✅ cookies.txt saved.");
+  await browser.close();
+}
+
+function ensureOutputDir() {
+  if (!fs.existsSync(OUTPUT_DIR)) {
+    fs.mkdirSync(OUTPUT_DIR);
+  }
+}
+
+function promptUserInput() {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    rl.question("Enter YouTube URLs (comma-separated): ", (input) => {
+      rl.close();
+      const videos = input
+        .split(",")
+        .map((url) => url.trim())
+        .filter((url) => url);
+      resolve(videos);
+    });
+  });
+}
+
+function sanitizeFilename(name) {
+  return name.replace(/[<>:"/\\|?*]/g, "");
+}
+
+function processVideo(video) {
+  console.log(`📥 Fetching title for: ${video}`);
+
+  exec(`yt-dlp --cookies ${COOKIES_FILE} --legacy-server-connect --get-title "${video}"`, (titleError, titleStdout) => {
+    if (titleError) {
+      console.error(`❌ Failed to fetch title: ${video}`, titleError);
+      return;
+    }
+
+    const videoTitle = sanitizeFilename(titleStdout.trim());
+    const tempFilename = `temp_${videoTitle}`;
+    const outputFilename = path.join(OUTPUT_DIR, `${videoTitle}.mp4`);
+
+    console.log(`📥 Downloading as "${videoTitle}.mp4"`);
+
+    exec(
+      `yt-dlp --cookies ${COOKIES_FILE} --legacy-server-connect -f "bv*+ba/b" -o "${tempFilename}.%(ext)s" "${video}"`,
+      (downloadError) => {
+        if (downloadError) {
+          console.error(`❌ Download failed: ${video}`, downloadError);
+          return;
+        }
+
+        console.log(`✅ Download complete: ${videoTitle}`);
+
+        const downloadedFile = fs.readdirSync(".").find((file) => file.startsWith(tempFilename));
+        if (!downloadedFile) {
+          console.error(`❌ Temp file not found for: ${videoTitle}`);
+          return;
+        }
+
+        const downloadedFilePath = path.resolve(downloadedFile);
+
+        console.log(`🎬 Converting ${downloadedFile} to MP4...`);
+        exec(
+          `ffmpeg -i "${downloadedFilePath}" -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 192k "${outputFilename}"`,
+          (convertError) => {
+            if (convertError) {
+              console.error(`❌ Conversion failed: ${videoTitle}`, convertError);
+              return;
+            }
+
+            console.log(`✅ Converted to MP4: ${outputFilename}`);
+            fs.unlink(downloadedFilePath, (unlinkErr) => {
+              if (unlinkErr) {
+                console.warn(`⚠️ Failed to delete temp file: ${downloadedFilePath}`);
+              } else {
+                console.log(`🧹 Deleted temp file: ${downloadedFilePath}`);
+              }
+            });
+          }
+        );
+      }
+    );
+  });
+}
+
+async function main() {
+  await ensureCookies();
+  ensureOutputDir();
+
+  const videos = await promptUserInput();
+  if (videos.length === 0) {
+    console.log("🚫 No URLs provided. Exiting...");
+    return;
+  }
+
+  videos.forEach(processVideo);
+}
+
+main();

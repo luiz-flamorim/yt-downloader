@@ -1,133 +1,130 @@
-# 🎥 YouTube Video Downloader
+# YouTube Video Downloader (Node + yt-dlp)
 
-This is a simple Node.js script that **downloads YouTube videos** in **MP4 format** using `yt-dlp` and **ensures macOS compatibility** by converting them with `ffmpeg`. The videos are saved in an `output/` folder, and if a file with the same name exists, a number is added automatically.
-
----
-
-## 🚀 Features
-✔ Downloads the **best video + audio quality**  
-✔ Saves videos as **MP4** in an `output/` folder  
-✔ **Auto-renames** duplicate files (e.g., `video01.mp4`, `video01-01.mp4`)  
-✔ Uses **yt-dlp** instead of `ytdl-core` (which is unreliable)  
-✔ **Works on macOS, Windows, and Linux**  
+This is a simple Node.js script that downloads YouTube videos in MP4 format using `yt-dlp` and converts them using `ffmpeg`. It handles authentication automatically through a browser window (using Puppeteer), stores cookies for reuse, and downloads multiple videos at once.
 
 ---
 
-## 📌 **Prerequisites**
-Before running the script, you need to have **Node.js**, **yt-dlp**, and **ffmpeg** installed.
+## Features
 
-### ✅ **1. Install Node.js**
-Check if you have Node.js installed:
+- Downloads best available video + audio
+- Converts to MP4 using `ffmpeg` for compatibility
+- Stores all videos in an `output/` folder
+- Remembers login via saved cookies (no need to re-login every time)
+- Accepts multiple YouTube URLs, comma-separated
+
+---
+
+## Prerequisites
+
+You must have the following installed:
+
+### 1. Node.js
+
+Check if installed:
 ```sh
 node -v
 ```
-If you don't have it, download and install it from [nodejs.org](https://nodejs.org/).
+If not, install it from [https://nodejs.org](https://nodejs.org).
 
----
+### 2. Required system tools
 
-### ✅ **2. Install Required Dependencies**
-Run the following command in your terminal:
-```sh
-npm install
-```
-This will install any required dependencies listed in `package.json`.
+Install `yt-dlp` and `ffmpeg`:
 
----
-
-### ✅ **3. Install yt-dlp and ffmpeg**
-#### **macOS (Homebrew)**
+#### macOS (Homebrew)
 ```sh
 brew install yt-dlp ffmpeg
 ```
-#### **Ubuntu/Debian**
+
+#### Ubuntu/Debian
 ```sh
 sudo apt update
 sudo apt install yt-dlp ffmpeg
 ```
-#### **Windows (Chocolatey)**
+
+#### Windows (Chocolatey)
 ```sh
 choco install yt-dlp ffmpeg
 ```
 
 ---
 
-## 🎬 **How to Use**
-### **1️⃣ Add YouTube Video Links**
-- Open `app.js`
-- Modify the `videos` array to include the links you want to download:
-```js
-const videos = [
-  "https://www.youtube.com/watch?v=EXAMPLE1",
-  "https://www.youtube.com/watch?v=EXAMPLE2"
-];
+## Setup
+
+1. Install project dependencies:
+
+```sh
+npm install
 ```
 
-### **2️⃣ Run the Script**
-Run the following command:
+This installs Puppeteer and other required packages.
+
+---
+
+## Usage
+
+### 1. Run the script:
+
 ```sh
 node app.js
 ```
-This will:
-- Download the best **video + audio**.
-- Convert it to **MP4** if necessary.
-- Save it inside the **output/** folder.
 
----
+### 2. Login to YouTube (first time only)
 
-## 📺 **Where are the Videos Saved?**
-- All downloaded videos are stored inside an `output/` folder.
-- If a file with the same name exists, the script adds a number:
-  ```
-  output/
-  ├── video01.mp4
-  ├── video01-01.mp4
-  ├── video02.mp4
-  ```
+- A browser window will open.
+- Log into your YouTube account manually.
+- The script waits 45 seconds for you to complete login.
+- Cookies will be saved to `cookies.txt` for reuse.
 
----
+> On future runs, login is skipped automatically if `cookies.txt` already exists.
 
-## 🛠 **Updating Dependencies**
-To keep your project clean and up to date:
-```sh
-npm prune       # Remove unused dependencies
-npm update      # Update to latest compatible versions
-npm outdated    # Check for outdated packages
-npx npm-check-updates -u  # Update all packages to latest versions
-npm install     # Install updated dependencies
+### 3. Enter video URLs
+
+After login, the terminal will prompt:
+
+```
+Enter YouTube URLs (comma-separated):
+```
+
+Example input:
+```
+https://www.youtube.com/watch?v=EXAMPLE1, https://www.youtube.com/watch?v=EXAMPLE2
 ```
 
 ---
 
-## 📝 **Troubleshooting**
-### 🔹 **Error: yt-dlp not found**
-Make sure `yt-dlp` is installed by running:
+## Output
+
+- All videos are downloaded and converted to MP4
+- Saved in the `output/` directory
+- Files are named after the video title
+
+---
+
+## Notes
+
+- You only need to log in once. After that, cookies are reused automatically.
+- To force a fresh login, delete `cookies.txt` and run the script again.
+
+---
+
+## Troubleshooting
+
+### yt-dlp not found
+Check with:
 ```sh
 yt-dlp --version
 ```
-If not installed, follow the installation steps above.
 
-### 🔹 **Error: ffmpeg not found**
-Check if `ffmpeg` is installed:
+### ffmpeg not found
+Check with:
 ```sh
 ffmpeg -version
 ```
-If not, install it using Homebrew, apt, or Chocolatey.
+
+If not installed, follow the install steps under "Prerequisites".
 
 ---
 
-## 🐝 **License**
+## License
+
 This project is open-source and available for personal use.
-
----
-
-## 💡 **Contributions**
-Feel free to **fork** this project, suggest improvements, or add features!
-
----
-
-### 💯 **Now Just Run:**
-```sh
-node app.js
-```
-And enjoy your downloaded videos! 🎥✨
-
